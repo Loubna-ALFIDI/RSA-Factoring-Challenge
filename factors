@@ -1,19 +1,58 @@
 #!/usr/bin/env /usr/bin/python3
 import sys
+import threading
+import math
+import random
 
-def factorize(number):
-    for i in range(2, int(number**0.5) + 1):
-        if number % i == 0:
-            return i, number // i
-    return None, None
+def gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
+
+def pollard_rho(n):
+    if n % 2 == 0:
+        return 2, n // 2
+
+    x, y, d = 2, 2, 1
+    f = lambda x: (x**2 + 1) % n
+    while d == 1:
+        x = f(x)
+        y = f(f(y))
+        d = gcd(abs(x - y), n)
+    
+    return d, n // d
+
+def factorize_thread(numbers, results):
+    for number in numbers:
+        p, q = pollard_rho(number)
+        results.append((number, p, q))
 
 def main(input_file):
+    num_threads = 4  # Adjust this based on your CPU cores
+    numbers = []
+    results = []
+    
     with open(input_file, 'r') as file:
         for line in file:
             number = int(line.strip())
-            p, q = factorize(number)
-            if p is not None and q is not None:
-                print(f"{number}={p}*{q}")
+            numbers.append(number)
+    
+    threads = []
+    chunk_size = math.ceil(len(numbers) / num_threads)
+    
+    for i in range(num_threads):
+        start_idx = i * chunk_size
+        end_idx = min((i + 1) * chunk_size, len(numbers))
+        thread = threading.Thread(target=factorize_thread, args=(numbers[start_idx:end_idx], results))
+        threads.append(thread)
+        thread.start()
+    
+    for thread in threads:
+        thread.join()
+    
+    for result in results:
+        number, p, q = result
+        print(f"{number}={p}*{q}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
